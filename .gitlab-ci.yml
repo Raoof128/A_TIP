@@ -1,0 +1,318 @@
+# GitLab CI/CD Pipeline for Threat Intelligence Platform
+
+variables:
+  PYTHON_VERSION: "3.11"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+
+# Define pipeline stages
+stages:
+  - lint
+  - test
+  - security
+  - build
+  - deploy
+
+# Cache configuration
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+# ==================== CODE QUALITY STAGE ====================
+
+code-quality:
+  stage: lint
+  image: python:${PYTHON_VERSION}
+  before_script:
+    - pip install flake8 pylint black isort mypy
+    - pip install -r requirements.txt
+  script:
+    # Black formatting check
+    - black --check collectors/ enrichment/ correlation/ --line-length=120
+    # Import sorting check
+    - isort --check-only collectors/ enrichment/ correlation/
+    # Flake8 style guide
+    - flake8 collectors/ enrichment/ correlation/ --max-line-length=120 --count --statistics
+    # Pylint code analysis
+    - pylint collectors/ enrichment/ correlation/ --max-line-length=120 --exit-zero
+    # Type checking
+    - mypy collectors/ enrichment/ correlation/ --ignore-missing-imports || true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+markdown-lint:
+  stage: lint
+  image: node:18
+  script:
+    - npm install -g markdownlint-cli
+    - markdownlint '**/*.md' --ignore node_modules || true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ==================== TEST STAGE ====================
+
+unit-tests:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  before_script:
+    - pip install -r requirements.txt
+    - pip install pytest pytest-cov pytest-mock
+  script:
+    - pytest tests/ -m "not integration" --cov=collectors --cov=enrichment --cov=correlation --cov-report=xml --cov-report=html --cov-report=term --junitxml=test-results.xml
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    when: always
+    paths:
+      - test-results.xml
+      - htmlcov/
+      - coverage.xml
+    reports:
+      junit: test-results.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+integration-tests:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  services:
+    - name: elasticsearch:8.10.2
+      alias: elasticsearch
+      command: ["bin/elasticsearch", "-Ediscovery.type=single-node", "-Expack.security.enabled=false"]
+  variables:
+    ELASTICSEARCH_URL: "http://elasticsearch:9200"
+    ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+  before_script:
+    - pip install -r requirements.txt
+    - pip install pytest
+    # Wait for Elasticsearch
+    - |
+      for i in {1..30}; do
+        curl -s http://elasticsearch:9200/_cluster/health && break
+        echo "Waiting for Elasticsearch..."
+        sleep 2
+      done
+  script:
+    - pytest tests/ -m integration -v
+  artifacts:
+    when: always
+    paths:
+      - test-results.xml
+    reports:
+      junit: test-results.xml
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  allow_failure: true
+
+# ==================== SECURITY STAGE ====================
+
+security-scan:
+  stage: security
+  image: python:${PYTHON_VERSION}
+  before_script:
+    - pip install bandit safety
+  script:
+    # Bandit security linter
+    - bandit -r collectors/ enrichment/ correlation/ -f json -o bandit-report.json || true
+    # Safety check for vulnerable dependencies
+    - safety check --json --output safety-report.json || true
+  artifacts:
+    when: always
+    paths:
+      - bandit-report.json
+      - safety-report.json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+sast:
+  stage: security
+  variables:
+    SAST_EXCLUDED_PATHS: "spec, test, tests, tmp, venv"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+
+container-scanning:
+  stage: security
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - docker build -t tip-scanner:latest -f docker/Dockerfile.airflow .
+    - |
+      curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+    - trivy image --exit-code 0 --severity HIGH,CRITICAL tip-scanner:latest
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  allow_failure: true
+
+# ==================== BUILD STAGE ====================
+
+validate-config:
+  stage: build
+  image: python:${PYTHON_VERSION}
+  before_script:
+    - pip install pyyaml
+  script:
+    # Validate all YAML configuration files
+    - python -c "import yaml; yaml.safe_load(open('config/config.yaml'))"
+    - python -c "import yaml; yaml.safe_load(open('config/prometheus.yml'))"
+    - python -c "import yaml; yaml.safe_load(open('config/alert_rules.yml'))"
+    - python -c "import yaml; yaml.safe_load(open('config/alertmanager.yml'))"
+    - python -c "import yaml; yaml.safe_load(open('docker/docker-compose.yml'))"
+    # Run configuration validator
+    - python config/config_validator.py || true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+docker-build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker info
+    - cd docker
+  script:
+    # Validate docker-compose
+    - docker-compose config
+    # Build images
+    - docker-compose build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+docker-push:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  script:
+    - cd docker
+    - docker-compose build
+    - docker-compose push
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  only:
+    - main
+
+# ==================== DEPLOY STAGE ====================
+
+deploy-staging:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $STAGING_SERVER >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh $STAGING_USER@$STAGING_SERVER << 'EOF'
+        cd /opt/threat-intelligence-platform
+        git pull origin develop
+        cd docker
+        docker-compose pull
+        docker-compose up -d
+        docker-compose exec -T airflow airflow dags list
+      EOF
+  environment:
+    name: staging
+    url: https://staging.tip.example.com
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+  when: manual
+
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $PRODUCTION_SERVER >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh $PRODUCTION_USER@$PRODUCTION_SERVER << 'EOF'
+        cd /opt/threat-intelligence-platform
+        git pull origin main
+        cd docker
+        docker-compose pull
+        docker-compose up -d --no-deps --build
+        # Run health checks
+        bash ../scripts/health_check.sh
+      EOF
+  environment:
+    name: production
+    url: https://tip.example.com
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  when: manual
+  needs: ["unit-tests", "integration-tests", "security-scan", "docker-build"]
+
+# ==================== SCHEDULED JOBS ====================
+
+nightly-tests:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  services:
+    - name: elasticsearch:8.10.2
+      alias: elasticsearch
+      command: ["bin/elasticsearch", "-Ediscovery.type=single-node", "-Expack.security.enabled=false"]
+  variables:
+    ELASTICSEARCH_URL: "http://elasticsearch:9200"
+  before_script:
+    - pip install -r requirements.txt
+    - pip install pytest pytest-cov
+  script:
+    - pytest tests/ --cov=collectors --cov=enrichment --cov=correlation -v
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+dependency-update-check:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  script:
+    - pip install pip-audit
+    - pip-audit -r requirements.txt || true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  allow_failure: true
+
+# ==================== CLEANUP ====================
+
+cleanup-old-images:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker system prune -af --filter "until=168h"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  when: manual

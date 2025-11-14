@@ -1,0 +1,302 @@
+# Grafana Alert Configuration for Threat Intelligence Platform
+# Defines alert rules within Grafana dashboards
+
+apiVersion: 1
+
+# Alert contact points
+contactPoints:
+  - name: email-team
+    type: email
+    settings:
+      addresses: tip-team@example.com
+      singleEmail: true
+
+  - name: slack-critical
+    type: slack
+    settings:
+      url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+      title: 'TIP Critical Alert'
+      text: '{{ template "alert.text" . }}'
+
+  - name: webhook-custom
+    type: webhook
+    settings:
+      url: http://tip-api:8000/webhooks/grafana-alerts
+      httpMethod: POST
+      username: grafana
+      password: your-password
+
+# Alert policies
+policies:
+  - name: default-policy
+    receiver: email-team
+    group_by: ['alertname', 'grafana_folder']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      - receiver: slack-critical
+        object_matchers:
+          - ['severity', '=', 'critical']
+        group_wait: 10s
+        repeat_interval: 1h
+        continue: true
+
+# Alert rules
+groups:
+  - name: ioc-collection-alerts
+    interval: 5m
+    rules:
+      - uid: ioc_collection_rate
+        title: Low IOC Collection Rate
+        condition: C
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: elasticsearch
+            model:
+              query: |
+                {
+                  "size": 0,
+                  "aggs": {
+                    "iocs_per_hour": {
+                      "date_histogram": {
+                        "field": "first_seen",
+                        "fixed_interval": "1h"
+                      }
+                    }
+                  }
+                }
+          - refId: B
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [100]
+                    type: lt
+        noDataState: NoData
+        execErrState: Error
+        for: 6h
+        annotations:
+          summary: 'IOC collection rate is below 100 per hour'
+          description: 'Only {{ $values.B }} IOCs collected in the last hour'
+        labels:
+          severity: warning
+          component: collection
+
+      - uid: critical_ioc_spike
+        title: Spike in Critical IOCs
+        condition: C
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: elasticsearch
+            model:
+              query: |
+                {
+                  "query": {
+                    "bool": {
+                      "filter": [
+                        {"term": {"severity": "critical"}},
+                        {"range": {"first_seen": {"gte": "now-1h"}}}
+                      ]
+                    }
+                  },
+                  "size": 0
+                }
+          - refId: B
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [500]
+                    type: gt
+        noDataState: OK
+        execErrState: Error
+        for: 15m
+        annotations:
+          summary: 'Unusual spike in critical IOCs detected'
+          description: '{{ $values.B }} critical IOCs in the last hour (threshold: 500)'
+        labels:
+          severity: high
+          component: intelligence
+
+  - name: threat-score-alerts
+    interval: 10m
+    rules:
+      - uid: high_threat_score_avg
+        title: High Average Threat Score
+        condition: C
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: elasticsearch
+            model:
+              query: |
+                {
+                  "query": {
+                    "range": {"first_seen": {"gte": "now-1h"}}
+                  },
+                  "size": 0,
+                  "aggs": {
+                    "avg_score": {
+                      "avg": {"field": "threat_score"}
+                    }
+                  }
+                }
+          - refId: B
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [0.8]
+                    type: gt
+        noDataState: NoData
+        execErrState: OK
+        for: 30m
+        annotations:
+          summary: 'Average threat score unusually high'
+          description: 'Average threat score is {{ $values.B | printf "%.2f" }} (threshold: 0.8)'
+        labels:
+          severity: info
+          component: intelligence
+
+  - name: system-performance-alerts
+    interval: 5m
+    rules:
+      - uid: elasticsearch_slow_queries
+        title: Elasticsearch Slow Queries
+        condition: C
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                rate(elasticsearch_indices_search_query_time_seconds_total[5m]) /
+                rate(elasticsearch_indices_search_query_total[5m])
+          - refId: B
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [2]
+                    type: gt
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: 'Elasticsearch queries are slow'
+          description: 'Average query time is {{ $values.B | printf "%.2f" }}s (threshold: 2s)'
+        labels:
+          severity: warning
+          component: database
+
+      - uid: high_disk_usage
+        title: High Disk Usage
+        condition: C
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (1 - (node_filesystem_avail_bytes{mountpoint="/"} /
+                node_filesystem_size_bytes{mountpoint="/"})) * 100
+          - refId: B
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            queryType: ''
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [85]
+                    type: gt
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: 'Disk usage is high'
+          description: 'Disk usage is {{ $values.B | printf "%.1f" }}% (threshold: 85%)'
+        labels:
+          severity: warning
+          component: infrastructure
+
+# Notification templates
+templates:
+  - name: alert.text
+    template: |
+      {{ define "alert.text" }}
+      {{ range .Alerts }}
+      *Alert:* {{ .Labels.alertname }}
+      *Severity:* {{ .Labels.severity }}
+      *Summary:* {{ .Annotations.summary }}
+      *Description:* {{ .Annotations.description }}
+      *Started:* {{ .StartsAt }}
+      {{ if .DashboardURL }}*Dashboard:* {{ .DashboardURL }}{{ end }}
+      {{ if .PanelURL }}*Panel:* {{ .PanelURL }}{{ end }}
+      {{ end }}
+      {{ end }}

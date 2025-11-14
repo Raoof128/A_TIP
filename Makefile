@@ -34,6 +34,10 @@ help:
 	@echo "  make collect          Run manual collection"
 	@echo "  make clean-data       Clean Elasticsearch data"
 	@echo "  make backup           Backup Elasticsearch data"
+	@echo "  make db-init          Initialize database indices"
+	@echo "  make db-migrate       Run database migrations"
+	@echo "  make db-status        Show migration status"
+	@echo "  make db-seed          Seed sample data"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make clean            Clean temporary files"
@@ -204,3 +208,41 @@ health:
 test-collectors:
 	@echo "Testing collectors..."
 	@python3 scripts/test_collectors.py --all
+
+# Database Management Commands
+db-init:
+	@echo "Initializing database..."
+	@python3 scripts/init_database.py
+
+db-init-force:
+	@echo "Re-initializing database (WARNING: deletes data)..."
+	@python3 scripts/init_database.py --force
+
+db-migrate:
+	@echo "Running database migrations..."
+	@python3 scripts/migrate_database.py up
+
+db-migrate-down:
+	@echo "Rolling back migrations..."
+	@read -p "Enter target version: " version; \
+	python3 scripts/migrate_database.py down $$version
+
+db-status:
+	@echo "Checking migration status..."
+	@python3 scripts/migrate_database.py status
+
+db-verify:
+	@echo "Verifying database..."
+	@python3 scripts/init_database.py --verify-only
+
+db-seed:
+	@echo "Seeding sample data..."
+	@python3 scripts/seed_data.py --count 100
+
+db-seed-large:
+	@echo "Seeding large dataset..."
+	@python3 scripts/seed_data.py --count 1000
+
+db-seed-clear:
+	@echo "Clearing and reseeding data..."
+	@python3 scripts/seed_data.py --clear --count 100

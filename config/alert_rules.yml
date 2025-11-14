@@ -1,0 +1,241 @@
+# Prometheus Alert Rules for Threat Intelligence Platform
+# Defines conditions that trigger alerts
+
+groups:
+  - name: threat_intelligence_platform
+    interval: 30s
+    rules:
+      # Service Health Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 2 minutes."
+
+      - alert: ElasticsearchDown
+        expr: up{job="elasticsearch"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Elasticsearch is down"
+          description: "Elasticsearch has been unreachable for more than 1 minute. Data ingestion is halted."
+
+      - alert: AirflowDown
+        expr: up{job="airflow"} == 0
+        for: 5m
+        labels:
+          severity: high
+          component: orchestration
+        annotations:
+          summary: "Airflow is down"
+          description: "Airflow has been unreachable for more than 5 minutes. Threat intelligence collection is stopped."
+
+      # Elasticsearch Health Alerts
+      - alert: ElasticsearchClusterRed
+        expr: elasticsearch_cluster_health_status{color="red"} == 1
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Elasticsearch cluster status is RED"
+          description: "At least one primary shard is not allocated. Data loss may occur."
+
+      - alert: ElasticsearchClusterYellow
+        expr: elasticsearch_cluster_health_status{color="yellow"} == 1
+        for: 15m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Elasticsearch cluster status is YELLOW"
+          description: "At least one replica shard is not allocated. Cluster redundancy is reduced."
+
+      - alert: ElasticsearchLowDiskSpace
+        expr: (elasticsearch_filesystem_data_available_bytes / elasticsearch_filesystem_data_size_bytes) < 0.1
+        for: 10m
+        labels:
+          severity: high
+          component: database
+        annotations:
+          summary: "Elasticsearch disk space low"
+          description: "Elasticsearch node has less than 10% disk space remaining on {{ $labels.instance }}."
+
+      - alert: ElasticsearchHighHeapUsage
+        expr: (elasticsearch_jvm_memory_used_bytes{area="heap"} / elasticsearch_jvm_memory_max_bytes{area="heap"}) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Elasticsearch heap usage high"
+          description: "Elasticsearch heap usage is above 90% on {{ $labels.instance }}. May cause OOM errors."
+
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage on {{ $labels.instance }} has been above 80% for 10 minutes."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage on {{ $labels.instance }} is above 85%."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: high
+          component: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space on {{ $labels.instance }} {{ $labels.mountpoint }} is below 10%."
+
+      # Container Health Alerts
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: docker
+        annotations:
+          summary: "Container memory usage high"
+          description: "Container {{ $labels.name }} is using more than 90% of its memory limit."
+
+      - alert: ContainerRestarting
+        expr: rate(container_last_seen{name=~"tip-.*"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: docker
+        annotations:
+          summary: "Container restarting frequently"
+          description: "Container {{ $labels.name }} is restarting frequently. Check logs for errors."
+
+      # Data Collection Alerts
+      - alert: NoRecentIOCs
+        expr: rate(elasticsearch_indices_indexing_index_total{index="threat-intel-iocs"}[1h]) == 0
+        for: 6h
+        labels:
+          severity: warning
+          component: collection
+        annotations:
+          summary: "No IOCs collected recently"
+          description: "No new IOCs have been indexed in the last 6 hours. Collection may have failed."
+
+      - alert: HighIndexingLatency
+        expr: rate(elasticsearch_indices_indexing_index_time_seconds_total[5m]) / rate(elasticsearch_indices_indexing_index_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High Elasticsearch indexing latency"
+          description: "Indexing latency is above 1 second per document. Database may be overloaded."
+
+      # API Performance Alerts (if custom metrics endpoint exists)
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="tip-api"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile API response time is above 2 seconds."
+
+      - alert: HighAPIErrorRate
+        expr: rate(http_requests_total{job="tip-api",status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: high
+          component: api
+        annotations:
+          summary: "High API error rate"
+          description: "API is returning more than 5% errors."
+
+      # Airflow DAG Alerts
+      - alert: AirflowDAGFailed
+        expr: increase(airflow_dag_run_failed[1h]) > 0
+        for: 5m
+        labels:
+          severity: high
+          component: collection
+        annotations:
+          summary: "Airflow DAG run failed"
+          description: "DAG {{ $labels.dag_id }} has failed. Threat intelligence collection interrupted."
+
+      - alert: AirflowDAGNotRunning
+        expr: time() - airflow_dag_run_end_date{state="success"} > 28800  # 8 hours
+        for: 30m
+        labels:
+          severity: warning
+          component: collection
+        annotations:
+          summary: "Airflow DAG has not run recently"
+          description: "DAG {{ $labels.dag_id }} has not completed successfully in over 8 hours."
+
+  - name: threat_scoring
+    interval: 1m
+    rules:
+      # Threat Intelligence Quality Alerts
+      - alert: HighCriticalIOCCount
+        expr: elasticsearch_indices_docs{index="threat-intel-iocs",severity="critical"} > 1000
+        for: 30m
+        labels:
+          severity: info
+          component: intelligence
+        annotations:
+          summary: "High number of critical IOCs detected"
+          description: "More than 1000 critical severity IOCs have been detected. May indicate active campaign."
+
+      - alert: LowDataQuality
+        expr: (sum(elasticsearch_indices_docs{index="threat-intel-iocs",confidence="<50"}) / sum(elasticsearch_indices_docs{index="threat-intel-iocs"})) > 0.3
+        for: 1h
+        labels:
+          severity: warning
+          component: intelligence
+        annotations:
+          summary: "Low confidence IOCs ratio high"
+          description: "More than 30% of IOCs have low confidence scores. Review data sources."
+
+  - name: security
+    interval: 1m
+    rules:
+      # Security Monitoring Alerts
+      - alert: UnauthorizedAccessAttempt
+        expr: rate(http_requests_total{status="401"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: high
+          component: security
+        annotations:
+          summary: "Multiple unauthorized access attempts"
+          description: "More than 10 unauthorized access attempts per minute detected."
+
+      - alert: SuspiciousActivityDetected
+        expr: rate(http_requests_total{status="403"}[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Suspicious activity detected"
+          description: "Multiple forbidden access attempts detected. Possible security probe."
