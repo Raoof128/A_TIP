@@ -1,0 +1,94 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Docker
+docker/volumes/
+
+# Environment Variables
+.env
+config/api_keys.env
+*.env
+
+# Secrets
+secrets/
+*.key
+*.pem
+*.cert
+
+# Data
+data/
+backups/
+*.db
+*.sqlite
+
+# Elasticsearch
+es-data/
+
+# Grafana
+grafana-data/
+
+# Airflow
+airflow_dags/__pycache__/
+airflow.cfg
+airflow.db
+unittests.cfg
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db

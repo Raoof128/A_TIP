@@ -1,0 +1,117 @@
+# Threat Intelligence Platform Configuration
+
+elasticsearch:
+  host: "tip-elasticsearch"
+  port: 9200
+  index_prefix: "threat-intel"
+  retention_days: 90
+  bulk_size: 500
+
+misp:
+  url: "https://tip-misp:8443"
+  api_key: "${MISP_API_KEY}"
+  verify_ssl: false
+  sync_enabled: true
+
+collectors:
+  alienvault_otx:
+    enabled: true
+    api_key: "${OTX_API_KEY}"
+    collection_limit: 500
+    schedule: "0 */6 * * *"  # Every 6 hours
+
+  virustotal:
+    enabled: true
+    api_key: "${VT_API_KEY}"
+    collection_limit: 1000
+    schedule: "30 */6 * * *"
+
+  abuseipdb:
+    enabled: true
+    api_key: "${ABUSEIPDB_API_KEY}"
+    confidence_threshold: 80
+    collection_limit: 1000
+    schedule: "0 */6 * * *"
+
+  urlhaus:
+    enabled: true
+    collection_limit: 2000
+    schedule: "15 */6 * * *"
+
+  phishtank:
+    enabled: false
+    api_key: "${PHISHTANK_API_KEY}"
+    collection_limit: 1000
+
+enrichment:
+  whois:
+    enabled: true
+    cache_ttl: 86400  # 24 hours
+    rate_limit: 10  # requests per minute
+
+  geoip:
+    enabled: true
+    database_path: "/opt/geoip/GeoLite2-City.mmdb"
+    fallback_to_api: true
+    api_provider: "ip-api.com"
+
+  passive_dns:
+    enabled: false
+    provider: "SecurityTrails"
+    api_key: "${SECURITYTRAILS_API_KEY}"
+
+scoring:
+  # Weights for threat score calculation (must sum to 1.0)
+  weights:
+    source_credibility: 0.40
+    sighting_frequency: 0.25
+    age_freshness: 0.15
+    multi_source: 0.10
+    tag_severity: 0.10
+
+  # Severity thresholds
+  thresholds:
+    critical: 80
+    high: 65
+    medium: 50
+    low: 30
+
+export:
+  stix:
+    enabled: true
+    version: "2.1"
+    output_dir: "/opt/exports/stix"
+
+  taxii:
+    enabled: false
+    server_url: "https://localhost:9000/taxii2"
+    collection_id: "threat-intel"
+
+  siem_api:
+    enabled: false
+    endpoints:
+      - name: "Splunk"
+        url: "${SPLUNK_HEC_URL}"
+        token: "${SPLUNK_HEC_TOKEN}"
+        source_type: "threat_intel"
+
+      - name: "ELK"
+        url: "${ELK_URL}"
+        index: "threat-intel"
+
+metrics:
+  collection_rate_target: 10000  # IOCs per day
+  false_positive_threshold: 0.02  # 2%
+  enrichment_coverage_target: 0.95  # 95%
+  processing_time_target: 5  # seconds per IOC
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "/var/log/tip/tip.log"
+
+performance:
+  max_workers: 4
+  batch_size: 100
+  connection_pool_size: 10
+  timeout: 30  # seconds

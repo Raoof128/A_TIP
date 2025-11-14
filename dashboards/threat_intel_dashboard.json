@@ -1,0 +1,213 @@
+{
+  "dashboard": {
+    "title": "Threat Intelligence Platform - Overview",
+    "tags": ["threat-intel", "security"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total IOCs Collected",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs",
+            "metrics": [
+              {
+                "type": "count"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "IOCs by Severity",
+        "type": "piechart",
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 6,
+          "h": 8
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs",
+            "metrics": [
+              {
+                "type": "terms",
+                "field": "severity.keyword"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "IOC Collection Rate (Last 24h)",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs",
+            "metrics": [
+              {
+                "type": "date_histogram",
+                "field": "first_seen",
+                "interval": "1h"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "IOCs by Type",
+        "type": "bargraph",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 6,
+          "h": 8
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs",
+            "metrics": [
+              {
+                "type": "terms",
+                "field": "type.keyword"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "IOCs by Source",
+        "type": "bargraph",
+        "gridPos": {
+          "x": 6,
+          "y": 8,
+          "w": 6,
+          "h": 8
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs",
+            "metrics": [
+              {
+                "type": "terms",
+                "field": "source.keyword"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Threat Score Distribution",
+        "type": "histogram",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs",
+            "metrics": [
+              {
+                "type": "histogram",
+                "field": "threat_score",
+                "interval": 10
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Geographic Distribution",
+        "type": "worldmap",
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs",
+            "metrics": [
+              {
+                "type": "geohash_grid",
+                "field": "geoip.location"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Top 10 Malicious IPs",
+        "type": "table",
+        "gridPos": {
+          "x": 12,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs AND type:ip",
+            "metrics": [
+              {
+                "type": "terms",
+                "field": "value.keyword",
+                "size": 10,
+                "order": "threat_score"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Recent Critical IOCs",
+        "type": "table",
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "query": "threat-intel-iocs AND severity:CRITICAL",
+            "metrics": [
+              {
+                "type": "top_hits",
+                "size": 20,
+                "sort": "first_seen:desc"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "schemaVersion": 16,
+    "version": 1
+  }
+}

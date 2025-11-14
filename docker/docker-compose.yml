@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: tip-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    networks:
+      - tip-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  misp:
+    image: coolacid/misp-docker:latest
+    container_name: tip-misp
+    ports:
+      - "8080:80"
+      - "8443:443"
+    environment:
+      - MYSQL_HOST=misp-db
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=misppassword
+      - MISP_ADMIN_EMAIL=admin@tip.local
+      - MISP_ADMIN_PASSPHRASE=admin123
+      - MISP_BASEURL=https://localhost:8443
+    depends_on:
+      - misp-db
+    networks:
+      - tip-network
+
+  misp-db:
+    image: mysql:8.0
+    container_name: tip-misp-db
+    environment:
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=misppassword
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    volumes:
+      - misp-db-data:/var/lib/mysql
+    networks:
+      - tip-network
+
+  airflow:
+    image: apache/airflow:2.7.3-python3.11
+    container_name: tip-airflow
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=thisisasecretkey123
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./airflow_dags:/opt/airflow/dags
+      - ../collectors:/opt/airflow/collectors
+      - ../enrichment:/opt/airflow/enrichment
+      - ../correlation:/opt/airflow/correlation
+      - ../config:/opt/airflow/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tip-network
+    command: >
+      bash -c "pip install elasticsearch pymisp OTXv2 requests pyyaml &&
+               airflow db init &&
+               airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@tip.local || true &&
+               airflow webserver & airflow scheduler"
+
+  postgres:
+    image: postgres:15
+    container_name: tip-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tip-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: tip-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-elasticsearch-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - tip-network
+
+volumes:
+  es-data:
+  misp-db-data:
+  postgres-data:
+  grafana-data:
+
+networks:
+  tip-network:
+    driver: bridge
