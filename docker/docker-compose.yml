@@ -8,17 +8,28 @@ services:
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
       - xpack.security.enabled=false
+      - xpack.ml.enabled=false
+      - bootstrap.memory_lock=true
     ports:
       - "9200:9200"
     volumes:
       - es-data:/usr/share/elasticsearch/data
     networks:
       - tip-network
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 60s
+    restart: unless-stopped
 
   misp:
     image: coolacid/misp-docker:latest
@@ -35,9 +46,17 @@ services:
       - MISP_ADMIN_PASSPHRASE=admin123
       - MISP_BASEURL=https://localhost:8443
     depends_on:
-      - misp-db
+      misp-db:
+        condition: service_healthy
     networks:
       - tip-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -k -f https://localhost/users/login || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
 
   misp-db:
     image: mysql:8.0
@@ -51,6 +70,13 @@ services:
       - misp-db-data:/var/lib/mysql
     networks:
       - tip-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "misp", "-pmisppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   airflow:
     image: apache/airflow:2.7.3-python3.11
@@ -60,21 +86,37 @@ services:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__WEBSERVER__SECRET_KEY=thisisasecretkey123
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT=False
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+      - PYTHONPATH=/opt/airflow/collectors:/opt/airflow/enrichment:/opt/airflow/correlation
+    env_file:
+      - ../config/api_keys.env
     ports:
       - "8081:8080"
     volumes:
-      - ./airflow_dags:/opt/airflow/dags
+      - ../airflow_dags:/opt/airflow/dags
       - ../collectors:/opt/airflow/collectors
       - ../enrichment:/opt/airflow/enrichment
       - ../correlation:/opt/airflow/correlation
       - ../config:/opt/airflow/config
+      - airflow-logs:/opt/airflow/logs
     depends_on:
       postgres:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks:
       - tip-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     command: >
-      bash -c "pip install elasticsearch pymisp OTXv2 requests pyyaml &&
+      bash -c "pip install --no-cache-dir elasticsearch pymisp OTXv2 requests pyyaml python-whois geoip2 &&
                airflow db init &&
                airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@tip.local || true &&
                airflow webserver & airflow scheduler"
@@ -90,11 +132,13 @@ services:
       - postgres-data:/var/lib/postgresql/data
     networks:
       - tip-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   grafana:
     image: grafana/grafana:10.2.0
@@ -104,17 +148,27 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_INSTALL_PLUGINS=grafana-elasticsearch-datasource
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
     volumes:
       - grafana-data:/var/lib/grafana
       - ../dashboards:/etc/grafana/provisioning/dashboards
     networks:
       - tip-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   es-data:
   misp-db-data:
   postgres-data:
   grafana-data:
+  airflow-logs:
 
 networks:
   tip-network:

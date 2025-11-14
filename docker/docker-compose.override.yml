@@ -1,0 +1,49 @@
+# Docker Compose Override for Development
+# This file is automatically loaded by docker-compose and provides development-specific settings
+#
+# Usage:
+#   docker-compose up -d  # Automatically uses both files
+#
+# To disable this override:
+#   docker-compose -f docker-compose.yml up -d
+
+version: '3.8'
+
+services:
+  # Development settings for Elasticsearch
+  elasticsearch:
+    environment:
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"  # Reduce memory for development
+    ports:
+      - "9200:9200"
+      - "9300:9300"  # For debugging
+
+  # Development settings for Airflow
+  airflow:
+    environment:
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False  # Auto-start DAGs
+      - AIRFLOW__WEBSERVER__RELOAD_ON_PLUGIN_CHANGE=True  # Auto-reload
+      - AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS=True
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth  # Enable API
+    volumes:
+      - ../:/opt/airflow/project:ro  # Mount entire project for development
+
+  # Development settings for Grafana
+  grafana:
+    environment:
+      - GF_LOG_LEVEL=debug
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../dashboards:/etc/grafana/provisioning/dashboards:ro
+
+  # Development settings for PostgreSQL
+  postgres:
+    ports:
+      - "5432:5432"  # Expose for debugging
+
+  # Development settings for MISP
+  misp:
+    environment:
+      - MISP_DEBUG=true

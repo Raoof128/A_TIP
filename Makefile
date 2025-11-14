@@ -11,6 +11,8 @@ help:
 	@echo "Setup Commands:"
 	@echo "  make install          Install Python dependencies"
 	@echo "  make setup            Initial setup (copy config, install deps)"
+	@echo "  make init             Run initialization checks"
+	@echo "  make validate         Validate configuration"
 	@echo ""
 	@echo "Docker Commands:"
 	@echo "  make start            Start all services"
@@ -19,10 +21,12 @@ help:
 	@echo "  make logs             View logs from all services"
 	@echo "  make logs-airflow     View Airflow logs"
 	@echo "  make logs-es          View Elasticsearch logs"
+	@echo "  make health           Run health checks on all services"
 	@echo ""
 	@echo "Development Commands:"
 	@echo "  make test             Run unit tests"
 	@echo "  make test-coverage    Run tests with coverage report"
+	@echo "  make test-collectors  Test collectors standalone"
 	@echo "  make lint             Run code quality checks"
 	@echo "  make format           Format code with black"
 	@echo ""
@@ -183,3 +187,20 @@ count-iocs:
 view-recent:
 	@echo "Viewing recent IOCs..."
 	@curl -s "http://localhost:9200/threat-intel-iocs/_search?size=10&sort=first_seen:desc" | python -m json.tool
+
+# New utility commands
+init:
+	@echo "Running initialization checks..."
+	@bash scripts/init.sh
+
+validate:
+	@echo "Validating configuration..."
+	@python3 config/config_validator.py
+
+health:
+	@echo "Running health checks..."
+	@bash scripts/health_check.sh
+
+test-collectors:
+	@echo "Testing collectors..."
+	@python3 scripts/test_collectors.py --all
