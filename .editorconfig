@@ -1,0 +1,82 @@
+# EditorConfig - Defines consistent coding styles across editors
+# https://editorconfig.org
+
+root = true
+
+# Default settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Python files
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# YAML files
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# Shell scripts
+[*.sh]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# Makefile
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+# Docker files
+[Dockerfile*]
+indent_style = space
+indent_size = 2
+
+[docker-compose*.yml]
+indent_style = space
+indent_size = 2
+
+# Configuration files
+[*.{toml,ini,cfg}]
+indent_style = space
+indent_size = 4
+
+# HTML/CSS/JS (if web interface is added)
+[*.{html,css,js,jsx,ts,tsx}]
+indent_style = space
+indent_size = 2
+
+# XML files
+[*.xml]
+indent_style = space
+indent_size = 2
+
+# SQL files
+[*.sql]
+indent_style = space
+indent_size = 2
+
+# Git files
+[.git*]
+end_of_line = lf
+
+# Text files
+[*.txt]
+end_of_line = lf

@@ -1,0 +1,102 @@
+# Development Dependencies for Threat Intelligence Platform
+# Install with: pip install -r requirements-dev.txt
+
+# Testing
+pytest>=7.4.3
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+pytest-asyncio>=0.21.1
+pytest-xdist>=3.5.0  # Parallel test execution
+pytest-timeout>=2.2.0
+pytest-benchmark>=4.0.0
+coverage>=7.3.2
+
+# Code Quality
+black>=23.11.0  # Code formatting
+isort>=5.12.0  # Import sorting
+flake8>=6.1.0  # Style guide enforcement
+pylint>=3.0.2  # Code analysis
+mypy>=1.7.1  # Type checking
+radon>=6.0.1  # Code complexity metrics
+mccabe>=0.7.0  # Complexity checker
+pycodestyle>=2.11.1
+pydocstyle>=6.3.0  # Docstring style checker
+
+# Security
+bandit>=1.7.5  # Security linter
+safety>=2.3.5  # Dependency vulnerability scanner
+pip-audit>=2.6.1  # Audit for known vulnerabilities
+
+# Type Stubs
+types-requests>=2.31.0
+types-PyYAML>=6.0.12
+types-python-dateutil>=2.8.19
+
+# Documentation
+sphinx>=7.2.6  # Documentation generator
+sphinx-rtd-theme>=2.0.0  # ReadTheDocs theme
+sphinx-autodoc-typehints>=1.25.2
+myst-parser>=2.0.0  # Markdown support in Sphinx
+mkdocs>=1.5.3  # Alternative documentation tool
+mkdocs-material>=9.5.2
+
+# Development Tools
+ipython>=8.18.1  # Enhanced Python shell
+ipdb>=0.13.13  # IPython debugger
+pdbpp>=0.10.3  # Better debugger
+rich>=13.7.0  # Beautiful terminal output
+colorama>=0.4.6  # Colored terminal output
+
+# Pre-commit Hooks
+pre-commit>=3.5.0
+
+# Build Tools
+build>=1.0.3
+twine>=4.0.2  # PyPI package upload
+wheel>=0.42.0
+setuptools>=69.0.2
+
+# Performance Profiling
+py-spy>=0.3.14  # Sampling profiler
+memory-profiler>=0.61.0
+line-profiler>=4.1.1
+
+# Linting Extensions
+flake8-docstrings>=1.7.0
+flake8-bugbear>=23.12.2
+flake8-comprehensions>=3.14.0
+flake8-simplify>=0.21.0
+flake8-annotations>=3.0.1
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+toml>=0.10.2
+click>=8.1.7  # CLI framework
+
+# Jupyter (for demos and analysis)
+jupyter>=1.0.0
+jupyterlab>=4.0.9
+notebook>=7.0.6
+nbconvert>=7.12.0
+
+# API Development (if implementing REST API)
+fastapi>=0.105.0
+uvicorn[standard]>=0.25.0
+pydantic>=2.5.2
+httpx>=0.25.2  # Async HTTP client for testing
+
+# Database Testing
+fakeredis>=2.20.1  # Redis mock for testing
+freezegun>=1.4.0  # Time mocking
+
+# Monitoring Development
+prometheus-client>=0.19.0
+grafana-api>=1.0.3
+
+# Load Testing
+locust>=2.20.0  # Load testing framework
+
+# Code Review
+pyupgrade>=3.15.0  # Upgrade Python syntax
+vulture>=2.10  # Find dead code

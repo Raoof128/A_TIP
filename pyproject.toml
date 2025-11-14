@@ -1,0 +1,263 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "threat-intelligence-platform"
+version = "2.0.0"
+description = "Enterprise-grade automated threat intelligence platform for collecting, enriching, and scoring IOCs"
+readme = "README.md"
+authors = [
+    {name = "Raouf", email = "raouf@example.com"}
+]
+maintainers = [
+    {name = "Raouf", email = "raouf@example.com"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Monitoring",
+    "Topic :: Internet :: Log Analysis",
+    "Typing :: Typed",
+]
+keywords = [
+    "threat-intelligence",
+    "ioc",
+    "security",
+    "cybersecurity",
+    "elasticsearch",
+    "airflow",
+    "stix",
+    "taxii",
+    "threat-hunting",
+    "siem",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31.0",
+    "elasticsearch>=8.10.0",
+    "python-whois>=0.8.0",
+    "geoip2>=4.7.0",
+    "pyyaml>=6.0.1",
+    "python-dotenv>=1.0.0",
+    "stix2>=3.0.1",
+    "taxii2-client>=2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-asyncio>=0.21.1",
+    "black>=23.11.0",
+    "flake8>=6.1.0",
+    "pylint>=3.0.2",
+    "mypy>=1.7.1",
+    "isort>=5.12.0",
+    "bandit>=1.7.5",
+    "safety>=2.3.5",
+    "pre-commit>=3.5.0",
+    "types-requests>=2.31.0",
+    "types-PyYAML>=6.0.12",
+]
+airflow = [
+    "apache-airflow>=2.7.3",
+    "apache-airflow-providers-elasticsearch>=5.1.1",
+]
+monitoring = [
+    "prometheus-client>=0.19.0",
+    "grafana-api>=1.0.3",
+]
+test = [
+    "pytest>=7.4.3",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Raoof128/A_TIP"
+Documentation = "https://github.com/Raoof128/A_TIP/blob/main/README.md"
+Repository = "https://github.com/Raoof128/A_TIP"
+Issues = "https://github.com/Raoof128/A_TIP/issues"
+Changelog = "https://github.com/Raoof128/A_TIP/blob/main/CHANGELOG.md"
+
+[project.scripts]
+tip-collect = "collectors.base_collector:main"
+tip-init-db = "scripts.init_database:main"
+tip-migrate-db = "scripts.migrate_database:main"
+tip-seed-data = "scripts.seed_data:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["collectors", "enrichment", "correlation", "exporters", "config"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.yml", "*.json"]
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | venv
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_glob = ["venv/*", ".venv/*", "build/*"]
+
+[tool.pylint]
+max-line-length = 120
+disable = [
+    "C0111",  # missing-docstring
+    "C0103",  # invalid-name
+    "R0913",  # too-many-arguments
+    "R0914",  # too-many-locals
+]
+good-names = ["i", "j", "k", "ex", "Run", "_", "es", "db"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "whois.*",
+    "geoip2.*",
+    "stix2.*",
+    "taxii2client.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+    "--cov=collectors",
+    "--cov=enrichment",
+    "--cov=correlation",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+testpaths = ["tests"]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests requiring external services",
+    "slow: Slow-running tests",
+    "collectors: Tests for collector modules",
+    "enrichment: Tests for enrichment modules",
+    "correlation: Tests for correlation/deduplication",
+]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["collectors", "enrichment", "correlation", "exporters"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if False:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv", "build"]
+skips = ["B101", "B601"]
+
+[tool.bandit.any_other_function_with_shell_equals_true]
+no_shell = [
+    "os.execl",
+    "os.execle",
+    "os.execlp",
+    "os.execlpe",
+    "os.execv",
+    "os.execve",
+    "os.execvp",
+    "os.execvpe",
+    "os.spawnl",
+    "os.spawnle",
+    "os.spawnlp",
+    "os.spawnlpe",
+    "os.spawnv",
+    "os.spawnve",
+    "os.spawnvp",
+    "os.spawnvpe",
+    "os.startfile"
+]
+shell = [
+    "os.system",
+    "os.popen",
+    "popen2.Popen3",
+    "popen2.Popen4",
+    "commands.getoutput",
+    "commands.getstatusoutput"
+]
+subprocess = [
+    "subprocess.Popen",
+    "subprocess.call",
+    "subprocess.check_call",
+    "subprocess.check_output"
+]

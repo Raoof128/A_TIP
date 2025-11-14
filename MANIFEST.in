@@ -1,0 +1,72 @@
+# MANIFEST.in - Specifies additional files to include in distribution
+
+# Documentation
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include CODE_OF_CONDUCT.md
+include SECURITY.md
+include SETUP_GUIDE.md
+include TROUBLESHOOTING.md
+include PROJECT_SUMMARY.md
+
+# Configuration files
+include pyproject.toml
+include setup.py
+include setup.cfg
+include requirements.txt
+include requirements-dev.txt
+include Makefile
+include pytest.ini
+include .coveragerc
+include .editorconfig
+include .gitignore
+include .gitattributes
+
+# Config directory
+recursive-include config *.yaml *.yml *.env.example *.py
+
+# Scripts
+recursive-include scripts *.py *.sh
+
+# Docker files
+recursive-include docker *.yml *.yaml Dockerfile* .dockerignore
+
+# Airflow DAGs
+recursive-include airflow_dags *.py
+
+# Dashboards
+recursive-include dashboards *.json
+
+# Documentation
+recursive-include docs *.md *.rst *.txt
+
+# Examples
+recursive-include examples *.py *.md *.json *.yaml
+
+# Tests (excluded from binary distribution but included in source)
+recursive-include tests *.py
+include tests/fixtures/*.json
+include tests/fixtures/*.yaml
+
+# Exclude development and build artifacts
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *~
+global-exclude __pycache__
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude *.egg-info
+prune venv
+prune .venv
+prune build
+prune dist
+prune .git
+prune .github
+prune htmlcov
+prune .pytest_cache
+prune .mypy_cache
+prune logs
+prune backups
+prune data

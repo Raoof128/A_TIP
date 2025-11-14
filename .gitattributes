@@ -1,0 +1,123 @@
+# Git attributes for consistent behavior across platforms
+# https://git-scm.com/docs/gitattributes
+
+# Auto detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# Explicitly declare text files
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf
+*.env text eol=lf
+*.env.example text eol=lf
+
+# Scripts should always have LF line endings
+scripts/**/*.py text eol=lf
+scripts/**/*.sh text eol=lf
+
+# Documentation
+*.rst text eol=lf
+LICENSE text eol=lf
+README text eol=lf
+CHANGELOG text eol=lf
+CONTRIBUTING text eol=lf
+
+# Binary files (explicitly declare to prevent Git from trying to modify them)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.bz2 binary
+*.7z binary
+
+# Python compiled bytecode
+*.pyc binary
+*.pyo binary
+*.pyd binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.egg binary
+*.whl binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Archives
+*.tar.gz binary
+*.tar.bz2 binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+
+# Audio/Video
+*.mp3 binary
+*.mp4 binary
+*.avi binary
+*.mov binary
+*.wmv binary
+*.flv binary
+
+# Git LFS (Large File Storage) tracking
+# Uncomment if using Git LFS
+# *.db filter=lfs diff=lfs merge=lfs -text
+# *.sqlite filter=lfs diff=lfs merge=lfs -text
+
+# Diff settings for specific file types
+*.py diff=python
+*.md diff=markdown
+*.json diff=json
+
+# Merge strategies
+*.lock merge=union
+
+# Export ignore (files not included in git archive)
+.gitignore export-ignore
+.gitattributes export-ignore
+.github export-ignore
+.editorconfig export-ignore
+tests export-ignore
+*.test.py export-ignore
+.coverage export-ignore
+htmlcov export-ignore
+.pytest_cache export-ignore
+.mypy_cache export-ignore
+__pycache__ export-ignore
+*.pyc export-ignore
+
+# Language-specific settings
+*.py linguist-language=Python
+*.sh linguist-language=Shell
+*.yml linguist-language=YAML
+*.yaml linguist-language=YAML
+*.md linguist-documentation
+docs/**/* linguist-documentation
+examples/**/* linguist-documentation
+
+# Diff output
+*.py diff=python
+*.json diff=json
+*.yaml diff=yaml
+*.yml diff=yaml
